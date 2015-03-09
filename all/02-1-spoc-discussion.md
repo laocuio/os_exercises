@@ -4,14 +4,55 @@
 
 ## 3.1 BIOS
  1. 比较UEFI和BIOS的区别。
+    答：UEFI是BIOS的一种升级替代方案。关于BIOS和UEFI二者的比较，如果仅从系统启动原理方面来做比较，UEFI之所以比BIOS强大，是因为UEFI本身已经相当于一个微型操作系统，其带来的便利之处在于：
+　　首先，UEFI已具备文件系统的支持，它能够直接读取FAT分区中的文件。。
+　　其次，可开发出直接在UEFI下运行的应用程序，这类程序文件通常以efi结尾。既然UEFI可以直接识别FAT分区中的文件，又有可直接在其中运行的应用程序。那么完全可以将Windows安装程序做成efi类型应用程序，然后把它放到任意fat分区中直接运行即可，如此一来安装Windows操作系统这件过去看上去稍微有点复杂的事情突然就变非常简单了
+　　最后，要知道这些都是BIOS做不到的。因为BIOS下启动操作系统之前，必须从硬盘上指定扇区读取系统启动代码（包含在主引导记录中），然后从活动分区中引导启动操作系统。对扇区的操作远比不上对分区中文件的操作更直观更简单，所以在BIOS下引导安装Windows操作系统，我们不得不使用一些工具对设备进行配置以达到启动要求。而在UEFI下，这些统统都不需要，不再需要主引导记录，不再需要活动分区，不需要任何工具，只要复制安装文件到一个FAT32（主）分区/U盘中，然后从这个分区/U盘启动
  1. 描述PXE的大致启动流程。
-
+    答：PXE(preboot execute environment，预启动执行环境)，工作于Client/Server的网络模式，支持工作站通过网络从远端服务器下载映像，并由此支持通过网络启动操作系统。其通信协议采用TCP/IP，与Internet连接高效而可靠，PXE启动流程大致如下：
+        客户端个人电脑开机后， 在 TCP/IP Bootrom 获得控制权之前先做自我测试。 
+        Bootprom 送出 BOOTP/DHCP 要求以取得 IP。
+        如果服务器收到个人电脑所送出的要求， 就会送回 BOOTP/DHCP 回应，内容包括客户端的 IP 地址， 预设网关， 及开机映像文件。否则，服务器会忽略这个要求。
+        Bootprom 由 TFTP 通讯协议从服务器下载开机映像文件。
+        个人电脑通过这个开机映像文件开机， 这个开机文件可以只是单纯的开机程式也可以是操作系统。
+        开机映像文件将包含 kernel loader 及压缩过的 kernel，此 kernel 将支持NTFS root系统。
+        远程客户端根据下载的文件启动机器。
+ 
 ## 3.2 系统启动流程
  1. 了解NTLDR的启动流程。
+    答：NTLDR文件的是一个隐藏的，只读的系统文件，位置在系统盘的根目录，用来装载操作系统。
+一般情况系统的引导过程是这样的代码
+        1、电源自检程序开始运行
+        2、主引导记录被装入内存，并且程序开始执行
+        3、活动分区的引导扇区被装入内存
+        4、NTLDR从引导扇区被装入并初始化
+        5、将处理器的实模式改为32位平滑内存模式
+        6、NTLDR开始运行适当的小文件系统驱动程序。
+        小文件系统驱动程序是建立在NTLDR内部的，它能读FAT或NTFS。
+        7、NTLDR读boot.ini文件
+        8、NTLDR装载所选操作系统
+        如果windows NT/windows 2000/windows XP/windows server 2003这些操作系统被选择，NTLDR运行Ntdetect。
+        对于其他的操作系统，NTLDR装载并运行Bootsect.dos然后向它传递控制。
+        windows NT过程结束。
+        9.Ntdetect搜索计算机硬件并将列表传送给NTLDR，以便将这些信息写进\\HKE Y_LOCAL_MACHINE\HARDWARE中。
+        10.然后NTLDR装载Ntoskrnl.exe，Hal.dll和系统信息集合。
+        11.Ntldr搜索系统信息集合，并装载设备驱动配置以便设备在启动时开始工作
+        12.Ntldr把控制权交给Ntoskrnl.exe，这时,启动程序结束,装载阶段开始
  1. 了解GRUB的启动流程。
+    答：NU GRUB（简称“GRUB”，GRand Unified Bootloader）是一个来自GNU项目的多操作系统启动管理器，它允许用户可以在计算机内同时安装有多个操作系统，比如不同版本的Windows和Linux，并在计算机启动时选择希望运行的操作系统。
+     （1）系统上电开机后，主板BIOS（Basic Input / Output System）运行POST（Power on self test）代码，检测系统外围关键设备（如：CPU、内存、显卡、I/O、键盘鼠标等）。硬件配置信息及一些用户配置参数存储在主板的CMOS(Complementary Metal Oxide Semiconductor)上（一般64字节）。执行POST代码对系统外围关键设备检测通过后，系统启动自举程序，根据我们在BIOS中设置的启动顺序搜索启动驱动器（比如硬盘、光驱、网络服务器等）。选择合适的启动器，比如通常情况下的硬盘设备，BIOS会读取硬盘设备的第一个扇区（MBR，512字节），并执行其中的代码。实际上这里BIOS并不关心启动设备第一个扇区中是什么内容，它只是负责读取该扇区内容、并执行，BIOS的任务就完成了。此后将系统启动的控制权移交到MBR部分的代码。
+(2)如上BIOS加载硬盘主引导扇区总共512字节的二进制代码，执行Initial Program Loader（IPL），IPL就是存储于446个字节的MBR中，因此IPL仅仅是GRUB的第一个部分（stage1）。
+(3) stage1的工作是加载 stage1_5（ext3文件系统就是e2fs_stage1_5），它位于0面0道第2扇区开始的十几个扇区内。stage1_5运行后，就可以识别/boot所在分区的文件系统了，所以：
+(4) 加载stage2并运行。此后grub会根据menulist或用户输入加载kernel，然后控制权就转到Linux了。
  1. 比较NTLDR和GRUB的功能有差异。
+     答：ntldr功能很少，只能引导win，只能装在硬盘；grub是第三方操作系统引导器，可以引导硬盘，光盘，网络，U盘，winxp，winpe，win7，linux，dos，
  1. 了解u-boot的功能。
-
+      答：系统引导支持NFS挂载、RAMDISK(压缩或非压缩)形式的根文件系统；支持NFS挂载、从FLASH中引导压缩或非压缩系统内核；
+             基本辅助功能强大的操作系统接口功能；可灵活设置、传递多个关键参数给操作系统，适合系统在不同开发阶段的调试要求与产品发布，尤以Linux支持最为强劲；支持目标板环境参数多种存储方式，如FLASH、NVRAM EEPROM；
+             CRC32校验可校验FLASH中内核、RAMDISK镜像文件是否完好；设备驱动串口、SDRAM、FLASH、以太网、LCD、NVRAM、EEPROM、键盘、USB、PCMCIA、PCI、RTC等驱动支持；
+            上电自检功能SDRAM、FLASH大小自动检测；SDRAM故障检测；CPU型号；
+             特殊功能XIP内核引导；
+      
 ## 3.3 中断、异常和系统调用比较
  1. 举例说明Linux中有哪些中断，哪些异常？
  1. Linux的系统调用有哪些？大致的功能分类有哪些？  (w2l1)
